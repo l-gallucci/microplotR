@@ -7,11 +7,11 @@
 mp_read_data(feature_table_path, taxonomy_path, metadata_path)
 }
 \arguments{
-\item{feature_table_path}{Path to feature_table.tsv/.csv.}
+\item{feature_table_path}{Path to feature_table.tsv/.csv/.rds.}
 
-\item{taxonomy_path}{Path to taxonomy.tsv/.csv.}
+\item{taxonomy_path}{Path to taxonomy.tsv/.csv/.rds.}
 
-\item{metadata_path}{Path to metadata.tsv/.csv.}
+\item{metadata_path}{Path to metadata.tsv/.csv/.rds.}
 }
 \value{
 A list with \code{feature_table}, \code{taxonomy}, \code{metadata} tibbles.

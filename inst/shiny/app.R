@@ -9,9 +9,19 @@ library(bslib)
 
 # ---- shared helpers -------------------------------------------------------
 
-.read_tsv_safe <- function(fileinfo) {
+.UPLOAD_ACCEPT <- c(".tsv", ".csv", ".rds")
+
+.read_table_safe <- function(fileinfo) {
+  # Shiny's uploaded file lands at a random-named temp path (fileinfo$datapath)
+  # that does NOT preserve the original extension, but mp_read_table() picks
+  # its parser (tsv/csv/rds) from the path's extension -- so copy to a temp
+  # file named with the *original* (fileinfo$name) extension first, then
+  # reuse the exact same reader the library itself uses.
   if (is.null(fileinfo)) return(NULL)
-  readr::read_delim(fileinfo$datapath, delim = "\t", show_col_types = FALSE)
+  ext <- tolower(tools::file_ext(fileinfo$name))
+  tmp <- tempfile(fileext = paste0(".", ext))
+  file.copy(fileinfo$datapath, tmp, overwrite = TRUE)
+  mp_read_table(tmp)
 }
 
 .validation_ui <- function(report) {
@@ -73,9 +83,9 @@ taxonomy_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
     sidebarPanel(
-      fileInput(ns("feature_table"), "Feature table (.tsv)", accept = ".tsv"),
-      fileInput(ns("taxonomy"), "Taxonomy (.tsv)", accept = ".tsv"),
-      fileInput(ns("metadata"), "Metadata (.tsv)", accept = ".tsv"),
+      fileInput(ns("feature_table"), "Feature table (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
+      fileInput(ns("taxonomy"), "Taxonomy (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
+      fileInput(ns("metadata"), "Metadata (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       uiOutput(ns("validation")),
       hr(),
       uiOutput(ns("controls"))
@@ -94,9 +104,9 @@ taxonomy_server <- function(id) {
     data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
       list(
-        feature_table = .read_tsv_safe(input$feature_table),
-        taxonomy = .read_tsv_safe(input$taxonomy),
-        metadata = .read_tsv_safe(input$metadata)
+        feature_table = .read_table_safe(input$feature_table),
+        taxonomy = .read_table_safe(input$taxonomy),
+        metadata = .read_table_safe(input$metadata)
       )
     })
 
@@ -190,8 +200,8 @@ function_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
     sidebarPanel(
-      fileInput(ns("gene_counts"), "Gene/KO count table (.tsv)", accept = ".tsv"),
-      fileInput(ns("annotation"), "Function annotation (.tsv)", accept = ".tsv"),
+      fileInput(ns("gene_counts"), "Gene/KO count table (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
+      fileInput(ns("annotation"), "Function annotation (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       uiOutput(ns("validation")),
       hr(),
       uiOutput(ns("controls"))
@@ -209,7 +219,7 @@ function_server <- function(id) {
 
     tables <- reactive({
       req(input$gene_counts, input$annotation)
-      list(feature_table = .read_tsv_safe(input$gene_counts), taxonomy = .read_tsv_safe(input$annotation))
+      list(feature_table = .read_table_safe(input$gene_counts), taxonomy = .read_table_safe(input$annotation))
     })
 
     report <- reactive({
@@ -267,7 +277,7 @@ mag_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
     sidebarPanel(
-      fileInput(ns("mag_table"), "MAG quality table (.tsv, CheckM/CheckM2)", accept = ".tsv"),
+      fileInput(ns("mag_table"), "MAG quality table (.tsv/.csv/.rds, CheckM/CheckM2)", accept = .UPLOAD_ACCEPT),
       uiOutput(ns("validation")),
       hr(),
       uiOutput(ns("controls"))
@@ -285,7 +295,7 @@ mag_server <- function(id) {
 
     mag_table <- reactive({
       req(input$mag_table)
-      .read_tsv_safe(input$mag_table)
+      .read_table_safe(input$mag_table)
     })
     report <- reactive(mp_validate_mag(mag_table()))
     is_valid <- reactive(mp_is_valid(report()))
@@ -339,11 +349,11 @@ assembly_ui <- function(id) {
       )),
       conditionalPanel(
         condition = sprintf("input['%s'] == 'nx'", ns("plot_type")),
-        fileInput(ns("contig_lengths"), "Contig lengths (.tsv)", accept = ".tsv")
+        fileInput(ns("contig_lengths"), "Contig lengths (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT)
       ),
       conditionalPanel(
         condition = sprintf("input['%s'] == 'summary'", ns("plot_type")),
-        fileInput(ns("assembly_summary"), "Assembly summary (.tsv, QUAST report)", accept = ".tsv")
+        fileInput(ns("assembly_summary"), "Assembly summary (.tsv/.csv/.rds, QUAST report)", accept = .UPLOAD_ACCEPT)
       ),
       uiOutput(ns("validation")),
       hr(),
@@ -360,8 +370,8 @@ assembly_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    contigs <- reactive({ req(input$contig_lengths); .read_tsv_safe(input$contig_lengths) })
-    summary_tbl <- reactive({ req(input$assembly_summary); .read_tsv_safe(input$assembly_summary) })
+    contigs <- reactive({ req(input$contig_lengths); .read_table_safe(input$contig_lengths) })
+    summary_tbl <- reactive({ req(input$assembly_summary); .read_table_safe(input$assembly_summary) })
 
     report <- reactive({
       if (input$plot_type == "nx") mp_validate_contig_lengths(contigs()) else mp_validate_assembly_summary(summary_tbl())
