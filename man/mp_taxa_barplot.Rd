@@ -17,7 +17,8 @@ mp_taxa_barplot(
   fix_taxonomy = TRUE,
   tax_fix_ranks = NULL,
   nested_legend = TRUE,
-  other_label = "Other"
+  other_label = "Other",
+  long = NULL
 )
 }
 \arguments{
@@ -67,6 +68,14 @@ non-taxonomic hierarchy (e.g. a functional annotation table).}
 
 \item{other_label}{Label for the pooled "everything else" bucket (taxa
 failing \code{min_rel_abund}/\code{min_prevalence}, or outside \code{top_n}).}
+
+\item{long}{Advanced: a precomputed long-format table (same
+shape \code{.mp_long_abundance()} returns) to reuse instead of re-melting/
+rejoining \code{data} from scratch -- e.g. a Shiny app caching one melt per
+upload and reusing it across rank/top_n/plot-type tweaks. \code{NULL}
+(default) derives it from \code{data} as before; \code{fix_taxonomy}/
+\code{tax_fix_ranks} are ignored if \code{long} is supplied (assumed already
+applied).}
 }
 \value{
 A ggplot2 object.

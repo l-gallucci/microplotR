@@ -25,6 +25,10 @@
 #' @param tax_fix_ranks Passed through to [mp_tax_fix()]'s `ranks` argument;
 #'   see [mp_taxa_barplot()].
 #' @param other_label Label for the pooled "everything else" bucket.
+#' @param long Advanced: a precomputed long-format table (same shape
+#'   `.mp_long_abundance()` returns) to reuse instead of re-melting/rejoining
+#'   `data` from scratch. `NULL` (default) derives it from `data` as before;
+#'   `fix_taxonomy`/`tax_fix_ranks` are ignored if `long` is supplied.
 #' @return A ggplot2 object.
 #' @export
 mp_taxa_treemap <- function(data,
@@ -36,8 +40,9 @@ mp_taxa_treemap <- function(data,
                              detection = 0,
                              fix_taxonomy = TRUE,
                              tax_fix_ranks = NULL,
-                             other_label = "Other") {
-  long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
+                             other_label = "Other",
+                             long = NULL) {
+  if (is.null(long)) long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
   long <- long |>
     dplyr::group_by(.data$Sample_ID) |>
     dplyr::mutate(rel_abund = 100 * .data$Count / sum(.data$Count)) |>

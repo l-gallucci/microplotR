@@ -16,7 +16,8 @@ mp_taxa_bubbleplot(
   sample_order = NULL,
   fix_taxonomy = TRUE,
   tax_fix_ranks = NULL,
-  max_size = 10
+  max_size = 10,
+  long = NULL
 )
 }
 \arguments{
@@ -54,6 +55,11 @@ samples by, or an explicit character vector of \code{Sample_ID}.}
 explicitly when \code{data$taxonomy} is a non-taxonomic hierarchy.}
 
 \item{max_size}{Maximum dot size (passed to \code{ggplot2::scale_size_area()}).}
+
+\item{long}{Advanced: a precomputed long-format table (same shape
+\code{.mp_long_abundance()} returns) to reuse instead of re-melting/rejoining
+\code{data} from scratch. \code{NULL} (default) derives it from \code{data} as before;
+\code{fix_taxonomy}/\code{tax_fix_ranks} are ignored if \code{long} is supplied.}
 }
 \value{
 A ggplot2 object.

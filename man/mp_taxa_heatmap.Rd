@@ -18,7 +18,8 @@ mp_taxa_heatmap(
   hclust_method = "average",
   show_dendrogram = TRUE,
   fix_taxonomy = TRUE,
-  tax_fix_ranks = NULL
+  tax_fix_ranks = NULL,
+  long = NULL
 )
 }
 \arguments{
@@ -59,6 +60,11 @@ one of \code{cluster_rows}/\code{cluster_cols}).}
 \code{NULL} (default) auto-detects standard 16S rank columns; pass
 explicitly when \code{data$taxonomy} is a non-taxonomic hierarchy (e.g. a
 functional annotation table).}
+
+\item{long}{Advanced: a precomputed long-format table (same shape
+\code{.mp_long_abundance()} returns) to reuse instead of re-melting/rejoining
+\code{data} from scratch. \code{NULL} (default) derives it from \code{data} as before;
+\code{fix_taxonomy}/\code{tax_fix_ranks} are ignored if \code{long} is supplied.}
 }
 \value{
 A ggplot2 object (\code{show_dendrogram = FALSE}) or a patchwork object

@@ -36,6 +36,10 @@
 #'   `NULL` (default) auto-detects standard 16S rank columns; pass
 #'   explicitly when `data$taxonomy` is a non-taxonomic hierarchy.
 #' @param max_size Maximum dot size (passed to `ggplot2::scale_size_area()`).
+#' @param long Advanced: a precomputed long-format table (same shape
+#'   `.mp_long_abundance()` returns) to reuse instead of re-melting/rejoining
+#'   `data` from scratch. `NULL` (default) derives it from `data` as before;
+#'   `fix_taxonomy`/`tax_fix_ranks` are ignored if `long` is supplied.
 #' @return A ggplot2 object.
 #' @export
 mp_taxa_bubbleplot <- function(data,
@@ -49,8 +53,9 @@ mp_taxa_bubbleplot <- function(data,
                                 sample_order = NULL,
                                 fix_taxonomy = TRUE,
                                 tax_fix_ranks = NULL,
-                                max_size = 10) {
-  long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
+                                max_size = 10,
+                                long = NULL) {
+  if (is.null(long)) long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
   long <- long |>
     dplyr::group_by(.data$Sample_ID) |>
     dplyr::mutate(rel_abund = 100 * .data$Count / sum(.data$Count)) |>

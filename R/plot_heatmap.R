@@ -37,6 +37,10 @@
 #'   `NULL` (default) auto-detects standard 16S rank columns; pass
 #'   explicitly when `data$taxonomy` is a non-taxonomic hierarchy (e.g. a
 #'   functional annotation table).
+#' @param long Advanced: a precomputed long-format table (same shape
+#'   `.mp_long_abundance()` returns) to reuse instead of re-melting/rejoining
+#'   `data` from scratch. `NULL` (default) derives it from `data` as before;
+#'   `fix_taxonomy`/`tax_fix_ranks` are ignored if `long` is supplied.
 #' @return A ggplot2 object (`show_dendrogram = FALSE`) or a patchwork object
 #'   (`show_dendrogram = TRUE`).
 #' @export
@@ -53,10 +57,11 @@ mp_taxa_heatmap <- function(data,
                              hclust_method = "average",
                              show_dendrogram = TRUE,
                              fix_taxonomy = TRUE,
-                             tax_fix_ranks = NULL) {
+                             tax_fix_ranks = NULL,
+                             long = NULL) {
   transform <- match.arg(transform)
 
-  long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
+  if (is.null(long)) long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
   long <- long |>
     dplyr::group_by(.data$Sample_ID) |>
     dplyr::mutate(rel_abund = 100 * .data$Count / sum(.data$Count)) |>

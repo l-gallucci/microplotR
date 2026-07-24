@@ -7,6 +7,12 @@
 library(shiny)
 library(bslib)
 
+# Shiny defaults to a 5 MB upload cap -- easily blown past by a real 16S
+# feature/taxonomy table (thousands of ASVs, especially with full-sequence
+# Feature_IDs from dada2 rather than short OTU/ASV IDs). 500 MB comfortably
+# covers that without leaving the limit unbounded.
+options(shiny.maxRequestSize = 500 * 1024^2)
+
 # ---- shared helpers -------------------------------------------------------
 
 .UPLOAD_ACCEPT <- c(".tsv", ".csv", ".rds")
@@ -47,22 +53,29 @@ library(bslib)
   }
   errs <- mp_errors(report)
   warns <- mp_warnings(report)
-  tagList(
-    if (nrow(errs) > 0) {
-      div(class = "alert alert-danger",
-          tags$strong("Errors (fix before plotting):"),
-          tags$ul(lapply(seq_len(nrow(errs)), function(i) {
-            tags$li(sprintf("[%s] %s: %s", errs$file[i], errs$field[i], errs$message[i]))
-          })))
-    },
-    if (nrow(warns) > 0) {
-      div(class = "alert alert-warning",
-          tags$strong("Warnings (plotting still allowed):"),
-          tags$ul(lapply(seq_len(nrow(warns)), function(i) {
-            tags$li(sprintf("[%s] %s: %s", warns$file[i], warns$field[i], warns$message[i]))
-          })))
-    },
-    if (nrow(errs) == 0 && nrow(warns) == 0) div(class = "alert alert-success", "Input looks good.")
+  # Findings can run long (dada2-style full-sequence IDs, thousands of
+  # features) even after mp_validate()'s own per-message truncation -- cap
+  # this box's height and let it scroll internally so it can never push the
+  # plot-type/rank/etc. controls further down out of the sidebar.
+  div(
+    style = "max-height: 300px; overflow-y: auto;",
+    tagList(
+      if (nrow(errs) > 0) {
+        div(class = "alert alert-danger",
+            tags$strong("Errors (fix before plotting):"),
+            tags$ul(lapply(seq_len(nrow(errs)), function(i) {
+              tags$li(sprintf("[%s] %s: %s", errs$file[i], errs$field[i], errs$message[i]))
+            })))
+      },
+      if (nrow(warns) > 0) {
+        div(class = "alert alert-warning",
+            tags$strong("Warnings (plotting still allowed):"),
+            tags$ul(lapply(seq_len(nrow(warns)), function(i) {
+              tags$li(sprintf("[%s] %s: %s", warns$file[i], warns$field[i], warns$message[i]))
+            })))
+      },
+      if (nrow(errs) == 0 && nrow(warns) == 0) div(class = "alert alert-success", "Input looks good.")
+    )
   )
 }
 
@@ -185,6 +198,18 @@ taxonomy_server <- function(id) {
     report <- reactive(mp_validate(data()))
     is_valid <- reactive(mp_is_valid(report()))
 
+    # Melt+join data() into the long (Feature_ID, Sample_ID, Count, ranks,
+    # metadata) shape every taxa plot needs -- once per validated upload,
+    # not once per rank/top_n/plot-type tweak. Each mp_taxa_*() call below
+    # accepts this precomputed table via `long =` instead of re-deriving it
+    # internally, which is what actually makes the caching take effect --
+    # the biggest win once a dataset runs into the thousands of features.
+    # Internal (non-exported) helper, hence `:::`.
+    long_data <- reactive({
+      req(is_valid())
+      microplotr:::.mp_long_abundance(data())
+    })
+
     output$validation <- renderUI({
       if (is.null(input$feature_table) || is.null(input$taxonomy) || is.null(input$metadata)) {
         return(.validation_ui(NULL))
@@ -215,7 +240,12 @@ taxonomy_server <- function(id) {
           selectInput(ns("rank"), "Rank", choices = tc, selected = if ("Genus" %in% tc) "Genus" else tc[1]),
           selectInput(ns("group_rank"), "Group rank (upper level)", choices = c("(none)", tc),
                       selected = if ("Phylum" %in% tc) "Phylum" else "(none)"),
-          numericInput(ns("top_n"), "Top N taxa (blank = all)", value = 10, min = 1)
+          numericInput(ns("top_n"), "Top N taxa (blank = all)", value = 10, min = 1),
+          numericInput(ns("min_rel_abund"), "Min mean relative abundance (%)", value = 0, min = 0, step = 0.1),
+          numericInput(ns("min_prevalence"), "Min prevalence (fraction of samples, 0-1)",
+                       value = 0, min = 0, max = 1, step = 0.05),
+          numericInput(ns("detection"), "Detection threshold for prevalence (rel. abundance %)",
+                       value = 0, min = 0, step = 0.1)
         ),
         conditionalPanel(
           condition = sprintf("input['%s'] == 'gradient'", ns("plot_type")),
@@ -237,15 +267,26 @@ taxonomy_server <- function(id) {
       req(is_valid(), input$plot_type)
       d <- data()
       gr <- input$group_rank %||% NULL
+      mra <- input$min_rel_abund %||% 0
+      mp <- input$min_prevalence %||% 0
+      det <- input$detection %||% 0
 
       switch(input$plot_type,
-        barplot = mp_taxa_barplot(d, rank = input$rank, group_rank = gr, top_n = input$top_n),
-        heatmap = mp_taxa_heatmap(d, rank = input$rank, top_n = input$top_n),
-        bubbleplot = mp_taxa_bubbleplot(d, rank = input$rank, group_rank = gr, top_n = input$top_n),
+        barplot = mp_taxa_barplot(d, rank = input$rank, group_rank = gr, top_n = input$top_n,
+                                   min_rel_abund = mra, min_prevalence = mp, detection = det,
+                                   long = long_data()),
+        heatmap = mp_taxa_heatmap(d, rank = input$rank, top_n = input$top_n,
+                                   min_rel_abund = mra, min_prevalence = mp, detection = det,
+                                   long = long_data()),
+        bubbleplot = mp_taxa_bubbleplot(d, rank = input$rank, group_rank = gr, top_n = input$top_n,
+                                         min_rel_abund = mra, min_prevalence = mp, detection = det,
+                                         long = long_data()),
         gradient = {
           req(input$gradient_var)
           mp_asv_gradient_plot(d, gradient_var = input$gradient_var, rank = input$rank,
-                                group_rank = gr, top_n = input$top_n)
+                                group_rank = gr, top_n = input$top_n,
+                                min_rel_abund = mra, min_prevalence = mp, detection = det,
+                                long = long_data())
         },
         alpha = {
           req(input$group_var)
@@ -256,7 +297,9 @@ taxonomy_server <- function(id) {
           mp_beta_diversity_plot(d, group_var = input$group_var, method = input$method,
                                   ordination = input$ordination)
         },
-        treemap = mp_taxa_treemap(d, rank = input$rank, group_rank = gr, top_n = input$top_n)
+        treemap = mp_taxa_treemap(d, rank = input$rank, group_rank = gr, top_n = input$top_n,
+                                   min_rel_abund = mra, min_prevalence = mp, detection = det,
+                                   long = long_data())
       )
     })
 

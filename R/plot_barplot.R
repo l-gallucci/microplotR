@@ -51,6 +51,13 @@
 #'   `group_rank`.
 #' @param other_label Label for the pooled "everything else" bucket (taxa
 #'   failing `min_rel_abund`/`min_prevalence`, or outside `top_n`).
+#' @param long Advanced: a precomputed long-format table (same
+#'   shape `.mp_long_abundance()` returns) to reuse instead of re-melting/
+#'   rejoining `data` from scratch -- e.g. a Shiny app caching one melt per
+#'   upload and reusing it across rank/top_n/plot-type tweaks. `NULL`
+#'   (default) derives it from `data` as before; `fix_taxonomy`/
+#'   `tax_fix_ranks` are ignored if `long` is supplied (assumed already
+#'   applied).
 #' @return A ggplot2 object.
 #' @export
 mp_taxa_barplot <- function(data,
@@ -65,13 +72,14 @@ mp_taxa_barplot <- function(data,
                              fix_taxonomy = TRUE,
                              tax_fix_ranks = NULL,
                              nested_legend = TRUE,
-                             other_label = "Other") {
+                             other_label = "Other",
+                             long = NULL) {
   if (nested_legend && is.null(group_rank)) {
     stop("`nested_legend = TRUE` requires `group_rank` (e.g. \"Phylum\"); ",
          "pass group_rank = NULL together with nested_legend = FALSE for a flat legend.")
   }
 
-  long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
+  if (is.null(long)) long <- .mp_long_abundance(data, fix_taxonomy = fix_taxonomy, tax_fix_ranks = tax_fix_ranks)
   long <- long |>
     dplyr::group_by(.data$Sample_ID) |>
     dplyr::mutate(rel_abund = 100 * .data$Count / sum(.data$Count)) |>

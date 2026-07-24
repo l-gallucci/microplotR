@@ -173,7 +173,17 @@ mp_validate <- function(data, gradient_column = NULL, group_column = NULL,
   .mp_report(findings)
 }
 
-.mp_vec <- function(x) paste0("[", paste(x, collapse = ", "), "]")
+.mp_vec <- function(x, limit = 10, max_chars = 40) {
+  # Truncates both the number of values shown and each value's own length --
+  # unbounded here makes findings unreadable (and can hang the Shiny
+  # sidebar) once Feature_ID/Sample_ID hold full DNA sequences (e.g. dada2
+  # ASV tables) or datasets run into the thousands of features. The
+  # underlying finding still carries the full untruncated vector; only this
+  # display string is shortened.
+  shown <- ifelse(nchar(x) > max_chars, paste0(substr(x, 1, max_chars), "..."), x)
+  if (length(shown) > limit) shown <- c(shown[seq_len(limit)], sprintf("(and %d more)", length(x) - limit))
+  paste0("[", paste(shown, collapse = ", "), "]")
+}
 
 .mp_bad_cells <- function(feature_ids, sample_cols, mask, limit = 10) {
   cells <- character(0)

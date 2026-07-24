@@ -18,7 +18,8 @@ mp_asv_gradient_plot(
   smooth_method = "loess",
   fix_taxonomy = TRUE,
   tax_fix_ranks = NULL,
-  other_label = "Other"
+  other_label = "Other",
+  long = NULL
 )
 }
 \arguments{
@@ -54,6 +55,11 @@ overlaying all taxa in one panel with a color legend.}
 see \code{\link[=mp_taxa_barplot]{mp_taxa_barplot()}}.}
 
 \item{other_label}{Label for the pooled "everything else" bucket.}
+
+\item{long}{Advanced: a precomputed long-format table (same shape
+\code{.mp_long_abundance()} returns) to reuse instead of re-melting/rejoining
+\code{data} from scratch. \code{NULL} (default) derives it from \code{data} as before;
+\code{fix_taxonomy}/\code{tax_fix_ranks} are ignored if \code{long} is supplied.}
 }
 \value{
 A ggplot2 object.
