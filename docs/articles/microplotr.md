@@ -1,0 +1,71 @@
+# Getting started with microplotr
+
+Literature-grounded, publication-ready microbial ecology plots from
+plain tidy input (feature table + taxonomy + metadata), with an
+upload-time validator that reports exactly what is wrong with your data,
+and a Shiny app for interactive use. Python counterpart: `microplotpy`
+(sibling repo) — same input format, same validator rules, same plot
+catalog.
+
+See [`vignette("data-format")`](../articles/data-format.md) for the
+required input files.
+
+## Install
+
+``` r
+devtools::install_deps()
+devtools::load_all()
+```
+
+## Quick start
+
+``` r
+library(microplotr)
+
+data <- mp_read_data(
+  "inst/extdata/example_valid/feature_table.tsv",
+  "inst/extdata/example_valid/taxonomy.tsv",
+  "inst/extdata/example_valid/metadata.tsv"
+)
+report <- mp_validate(data, gradient_column = "Depth_m", group_column = "Group")
+mp_is_valid(report)
+
+mp_taxa_barplot(data, rank = "Genus", group_rank = "Phylum", top_n = 10)
+```
+
+## Shiny app
+
+``` r
+shiny::runApp(system.file("shiny", package = "microplotr"))
+```
+
+Four tabs (Taxonomy, Functional profile, MAG quality, Assembly QC),
+each: upload the required file(s) → validator shows errors/warnings
+inline → pick a plot type and parameters → view/download the plot as PNG
+or SVG at a size you choose.
+
+## Plot catalog
+
+**Taxonomy** — [`vignette("barplot")`](../articles/barplot.md),
+[`vignette("heatmap")`](../articles/heatmap.md),
+[`vignette("bubbleplot")`](../articles/bubbleplot.md),
+[`vignette("gradient")`](../articles/gradient.md),
+[`vignette("alpha_diversity")`](../articles/alpha_diversity.md),
+[`vignette("beta_diversity")`](../articles/beta_diversity.md),
+[`vignette("treemap")`](../articles/treemap.md).
+
+**Functional profiles** (eggNOG-mapper/KofamScan-shaped) —
+[`vignette("function_profile")`](../articles/function_profile.md)
+(barplot/heatmap/treemap wrappers around the taxa engine).
+
+**Metagenomics** —
+[`vignette("mag_quality")`](../articles/mag_quality.md)
+(CheckM/CheckM2), [`vignette("assembly")`](../articles/assembly.md)
+(QUAST-shaped Nx curve + summary).
+
+Every plot resolves missing/unclassified annotation via
+[`mp_tax_fix()`](../reference/mp_tax_fix.md), supports
+abundance/prevalence filtering via
+[`mp_filter_taxa()`](../reference/mp_filter_taxa.md), and returns a
+plain `ggplot2` object you can extend further (`p + ggplot2::theme(...)`
+etc.) — nothing here is a static image.

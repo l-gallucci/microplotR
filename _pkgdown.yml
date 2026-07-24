@@ -1,0 +1,82 @@
+url: ~
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+home:
+  title: microplotr
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+
+articles:
+  - title: Reference
+    navbar: ~
+    contents:
+      - data-format
+  - title: Taxonomy plots
+    navbar: Taxonomy
+    contents:
+      - barplot
+      - heatmap
+      - bubbleplot
+      - gradient
+      - alpha_diversity
+      - beta_diversity
+      - treemap
+  - title: Functional profiles
+    navbar: Functional profiles
+    contents:
+      - function_profile
+  - title: Metagenomics
+    navbar: Metagenomics
+    contents:
+      - mag_quality
+      - assembly
+
+reference:
+  - title: Import & validate
+    desc: Read tidy input and check it before plotting.
+    contents:
+      - mp_read_data
+      - mp_validate
+      - mp_validate_mag
+      - mp_validate_contig_lengths
+      - mp_validate_assembly_summary
+      - mp_errors
+      - mp_warnings
+      - mp_is_valid
+
+  - title: Taxonomy fallback & filtering
+    desc: Shared machinery used by every taxa/function plot.
+    contents:
+      - mp_tax_fix
+      - mp_filter_taxa
+      - mp_nested_order_palette
+      - mp_theme_pub
+
+  - title: Taxonomy plots
+    contents:
+      - mp_taxa_barplot
+      - mp_taxa_heatmap
+      - mp_taxa_bubbleplot
+      - mp_asv_gradient_plot
+      - mp_alpha_diversity_plot
+      - mp_beta_diversity_plot
+      - mp_taxa_treemap
+
+  - title: Functional profiles
+    contents:
+      - mp_function_barplot
+      - mp_function_heatmap
+      - mp_function_treemap
+
+  - title: Metagenomics
+    contents:
+      - mp_mag_quality_plot
+      - mp_mag_quality_distribution
+      - mp_assembly_nx_plot
+      - mp_assembly_summary_barplot

@@ -1,0 +1,39 @@
+Package: microplotr
+Title: Literature-Grounded Microbial Ecology Plots From Tidy Input
+Version: 0.1.0
+Authors@R: person("Luigi", "Gallucci", email = "luigigallucci8@gmail.com", role = c("aut", "cre"))
+Description: Literature-grounded, publication-ready plots for marker-gene
+    (e.g. 16S) microbiome data, functional profiles (eggNOG-mapper/
+    KofamScan-shaped), and metagenomics (MAG quality, assembly QC) from
+    plain tidy input, built on ggplot2. Includes an upload-time validator
+    that reports exactly what is wrong with the input data, and a Shiny
+    app for interactive use.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends: R (>= 4.1)
+Imports:
+    readr,
+    dplyr,
+    tidyr,
+    ggplot2,
+    ggtext,
+    colorspace,
+    rlang,
+    vegan,
+    ggdendro,
+    patchwork,
+    scales,
+    treemapify,
+    ggpubr
+Suggests:
+    testthat (>= 3.0.0),
+    shiny,
+    bslib,
+    tibble,
+    knitr,
+    rmarkdown,
+    pkgdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3

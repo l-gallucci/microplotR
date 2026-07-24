@@ -1,0 +1,174 @@
+# microplotr
+
+Literature-grounded, publication-ready microbial ecology plots from
+plain tidy input (feature table + taxonomy + metadata), with an
+upload-time validator that reports exactly what is wrong with your data,
+and a Shiny app for interactive use. Built on ggplot2. Python
+counterpart: [`microplotpy`](../microplotpy) — same input format, same
+validator rules, same plot catalog.
+
+See [`data-format.md`](data-format.md) for the required input files, and
+[`docs/`](docs) for one page per plot (input spec, parameters,
+literature grounding).
+
+## Plot catalog
+
+- **Taxonomy**: [`mp_taxa_barplot()`](reference/mp_taxa_barplot.md)
+  (nested-legend stacked barplot),
+  [`mp_taxa_heatmap()`](reference/mp_taxa_heatmap.md) (CLR/log10,
+  clustered), [`mp_taxa_bubbleplot()`](reference/mp_taxa_bubbleplot.md),
+  [`mp_asv_gradient_plot()`](reference/mp_asv_gradient_plot.md)
+  (abundance over a continuous gradient),
+  [`mp_alpha_diversity_plot()`](reference/mp_alpha_diversity_plot.md),
+  [`mp_beta_diversity_plot()`](reference/mp_beta_diversity_plot.md)
+  (PCoA/NMDS + PERMANOVA),
+  [`mp_taxa_treemap()`](reference/mp_taxa_treemap.md).
+- **Functional profiles** (eggNOG-mapper/KofamScan-shaped):
+  [`mp_function_barplot()`](reference/mp_function_barplot.md),
+  [`mp_function_heatmap()`](reference/mp_function_heatmap.md),
+  [`mp_function_treemap()`](reference/mp_function_treemap.md) — thin
+  wrappers around the taxa engine.
+- **Metagenomics**:
+  [`mp_mag_quality_plot()`](reference/mp_mag_quality_plot.md)/[`mp_mag_quality_distribution()`](reference/mp_mag_quality_distribution.md)
+  (CheckM/CheckM2),
+  [`mp_assembly_nx_plot()`](reference/mp_assembly_nx_plot.md)/[`mp_assembly_summary_barplot()`](reference/mp_assembly_summary_barplot.md)
+  (QUAST-shaped).
+
+Every plot resolves missing/unclassified annotation via
+[`mp_tax_fix()`](reference/mp_tax_fix.md), supports abundance/prevalence
+filtering via [`mp_filter_taxa()`](reference/mp_filter_taxa.md), and
+returns a plain `ggplot2` object you can extend further
+(`p + ggplot2::theme(...)` etc.) — nothing here is a static image.
+
+## Install (dev)
+
+``` r
+devtools::install_deps()
+devtools::load_all()
+devtools::test()
+```
+
+## Shiny app
+
+``` r
+devtools::load_all()
+shiny::runApp("inst/shiny")
+```
+
+Four tabs (Taxonomy, Functional profile, MAG quality, Assembly QC),
+each: upload the required file(s) → validator shows errors/warnings
+inline → pick a plot type and parameters → view/download the plot as
+PNG.
+
+## Quick usage (library)
+
+``` r
+library(microplotr)
+
+data <- mp_read_data(
+  "inst/extdata/example_valid/feature_table.tsv",
+  "inst/extdata/example_valid/taxonomy.tsv",
+  "inst/extdata/example_valid/metadata.tsv"
+)
+report <- mp_validate(data, gradient_column = "Depth_m", group_column = "Group")
+mp_is_valid(report)
+
+mp_taxa_barplot(data, rank = "Genus", group_rank = "Phylum", top_n = 10)
+```
+
+Try validation against `inst/extdata/example_broken_*` to see what it
+catches (ID mismatches, negative counts, missing taxonomy columns,
+duplicate feature IDs).
+
+# Package index
+
+## Import & validate
+
+Read tidy input and check it before plotting.
+
+- [`mp_read_data()`](mp_read_data.md) : Read tidy microbiome input files
+- [`mp_validate()`](mp_validate.md) : Validate tidy microbiome input
+  (feature table + taxonomy + metadata)
+- [`mp_validate_mag()`](mp_validate_mag.md) : Validate a MAG
+  (metagenome-assembled genome) quality table
+- [`mp_validate_contig_lengths()`](mp_validate_contig_lengths.md) :
+  Validate a per-contig length table
+- [`mp_validate_assembly_summary()`](mp_validate_assembly_summary.md) :
+  Validate an assembly summary table
+- [`mp_errors()`](mp_errors.md) : Errors from a validation report
+- [`mp_warnings()`](mp_warnings.md) : Warnings from a validation report
+- [`mp_is_valid()`](mp_is_valid.md) : Whether a validation report has no
+  errors
+
+## Taxonomy fallback & filtering
+
+Shared machinery used by every taxa/function plot.
+
+- [`mp_tax_fix()`](mp_tax_fix.md) : Fix unknown/missing taxonomy labels
+  by falling back to the last known rank
+- [`mp_filter_taxa()`](mp_filter_taxa.md) : Filter taxa by minimum
+  abundance and/or prevalence
+- [`mp_nested_order_palette()`](mp_nested_order_palette.md) : Build
+  ordering, nested color palette, and nested legend labels for a
+  taxon-colored plot
+- [`mp_theme_pub()`](mp_theme_pub.md) : Minimal publication-figure
+  ggplot2 theme
+
+## Taxonomy plots
+
+- [`mp_taxa_barplot()`](mp_taxa_barplot.md) : Stacked relative-abundance
+  taxa barplot, optionally with a nested legend
+- [`mp_taxa_heatmap()`](mp_taxa_heatmap.md) : Clustered taxa heatmap
+- [`mp_taxa_bubbleplot()`](mp_taxa_bubbleplot.md) : Taxa bubble (dot)
+  plot
+- [`mp_asv_gradient_plot()`](mp_asv_gradient_plot.md) : ASV/taxon
+  abundance over a continuous gradient
+- [`mp_alpha_diversity_plot()`](mp_alpha_diversity_plot.md) : Alpha
+  diversity boxplot
+- [`mp_beta_diversity_plot()`](mp_beta_diversity_plot.md) : Beta
+  diversity ordination plot
+- [`mp_taxa_treemap()`](mp_taxa_treemap.md) : Taxa (or functional)
+  treemap
+
+## Functional profiles
+
+- [`mp_function_barplot()`](mp_function_barplot.md) : Functional profile
+  barplot
+- [`mp_function_heatmap()`](mp_function_heatmap.md) : Functional profile
+  heatmap
+- [`mp_function_treemap()`](mp_function_treemap.md) : Functional treemap
+
+## Metagenomics
+
+- [`mp_mag_quality_plot()`](mp_mag_quality_plot.md) : MAG
+  (metagenome-assembled genome) quality plot
+- [`mp_mag_quality_distribution()`](mp_mag_quality_distribution.md) :
+  MAG completeness / contamination distribution
+- [`mp_assembly_nx_plot()`](mp_assembly_nx_plot.md) : Assembly Nx curve
+- [`mp_assembly_summary_barplot()`](mp_assembly_summary_barplot.md) :
+  Assembly summary barplot
+
+# Articles
+
+### Reference
+
+- [Input data format](data-format.md):
+
+### Taxonomy plots
+
+- [Taxa barplot](barplot.md):
+- [Taxa heatmap](heatmap.md):
+- [Taxa bubble (dot) plot](bubbleplot.md):
+- [ASV/taxon abundance over a continuous gradient](gradient.md):
+- [Alpha diversity](alpha_diversity.md):
+- [Beta diversity](beta_diversity.md):
+- [Taxa / functional treemap](treemap.md):
+
+### Functional profiles
+
+- [Functional profile barplot/heatmap](function_profile.md):
+
+### Metagenomics
+
+- [MAG quality plot](mag_quality.md):
+- [Assembly QC: Nx curve + summary barplot](assembly.md):
