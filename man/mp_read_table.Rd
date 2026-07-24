@@ -4,7 +4,7 @@
 \alias{mp_read_table}
 \title{Read a single tidy table (.tsv, .csv, or .rds)}
 \usage{
-mp_read_table(path)
+mp_read_table(path, id_col = NULL)
 }
 \arguments{
 \item{path}{Path to the file. For a Shiny \code{fileInput}, pass the
@@ -13,6 +13,15 @@ mp_read_table(path)
 \code{mp_read_table(input$file$datapath)} only works if \code{datapath} itself
 ends in the right extension -- see \code{inst/shiny/app.R} for the pattern
 used when that's not the case.}
+
+\item{id_col}{Name of the ID column this table is expected to have
+(e.g. \code{"Feature_ID"}, \code{"Sample_ID"}). Only used for \code{.rds} input that
+turns out to be a \code{matrix} (common when exporting from \code{phyloseq} or
+similar, where feature/sample IDs live in \code{rownames()} rather than a
+column): the matrix is converted to a data frame and, if it doesn't
+already have a column named \code{id_col}, its rownames are promoted into
+one. Leave \code{NULL} to skip that promotion (rownames are dropped as
+usual, matching plain \code{as.data.frame()} behavior).}
 }
 \value{
 A tibble (or data frame, for \code{.rds}) with character columns.
@@ -20,10 +29,11 @@ A tibble (or data frame, for \code{.rds}) with character columns.
 \description{
 Delimiter/format is picked from the file extension: \code{.tsv}/\code{.txt} reads
 tab-delimited, \code{.csv} reads comma-delimited, \code{.rds} reads a serialized R
-object via \code{\link[=readRDS]{readRDS()}} (must be a data frame/tibble). Values always come
-back character-typed (no numeric coercion) so \code{\link[=mp_validate]{mp_validate()}} can
-distinguish "not numeric" from "NA" -- an \code{.rds} data frame with real
-numeric/integer columns is converted to character on read for the same
-reason. Shared by \code{\link[=mp_read_data]{mp_read_data()}} and the Shiny apps, so upload
-handling and library loading never drift apart.
+object via \code{\link[=readRDS]{readRDS()}} (a data frame/tibble, or a matrix -- e.g. a
+\code{phyloseq::otu_table()} -- which is coerced to one, see \code{id_col} below).
+Values always come back character-typed (no numeric coercion) so
+\code{\link[=mp_validate]{mp_validate()}} can distinguish "not numeric" from "NA" -- an \code{.rds}
+input with real numeric/integer columns is converted to character on
+read for the same reason. Shared by \code{\link[=mp_read_data]{mp_read_data()}} and the Shiny
+apps, so upload handling and library loading never drift apart.
 }

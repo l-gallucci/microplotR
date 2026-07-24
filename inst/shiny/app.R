@@ -11,17 +11,19 @@ library(bslib)
 
 .UPLOAD_ACCEPT <- c(".tsv", ".csv", ".rds")
 
-.read_table_safe <- function(fileinfo) {
+.read_table_safe <- function(fileinfo, id_col = NULL) {
   # Shiny's uploaded file lands at a random-named temp path (fileinfo$datapath)
   # that does NOT preserve the original extension, but mp_read_table() picks
   # its parser (tsv/csv/rds) from the path's extension -- so copy to a temp
   # file named with the *original* (fileinfo$name) extension first, then
-  # reuse the exact same reader the library itself uses.
+  # reuse the exact same reader the library itself uses. id_col is passed
+  # through so an .rds matrix (e.g. a phyloseq otu_table()) gets its
+  # rownames promoted into the right ID column instead of erroring.
   if (is.null(fileinfo)) return(NULL)
   ext <- tolower(tools::file_ext(fileinfo$name))
   tmp <- tempfile(fileext = paste0(".", ext))
   file.copy(fileinfo$datapath, tmp, overwrite = TRUE)
-  mp_read_table(tmp)
+  mp_read_table(tmp, id_col = id_col)
 }
 
 .validation_ui <- function(report) {
@@ -104,9 +106,9 @@ taxonomy_server <- function(id) {
     data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
       list(
-        feature_table = .read_table_safe(input$feature_table),
-        taxonomy = .read_table_safe(input$taxonomy),
-        metadata = .read_table_safe(input$metadata)
+        feature_table = .read_table_safe(input$feature_table, id_col = "Feature_ID"),
+        taxonomy = .read_table_safe(input$taxonomy, id_col = "Feature_ID"),
+        metadata = .read_table_safe(input$metadata, id_col = "Sample_ID")
       )
     })
 
@@ -219,7 +221,10 @@ function_server <- function(id) {
 
     tables <- reactive({
       req(input$gene_counts, input$annotation)
-      list(feature_table = .read_table_safe(input$gene_counts), taxonomy = .read_table_safe(input$annotation))
+      list(
+        feature_table = .read_table_safe(input$gene_counts, id_col = "Feature_ID"),
+        taxonomy = .read_table_safe(input$annotation, id_col = "Feature_ID")
+      )
     })
 
     report <- reactive({
@@ -295,7 +300,7 @@ mag_server <- function(id) {
 
     mag_table <- reactive({
       req(input$mag_table)
-      .read_table_safe(input$mag_table)
+      .read_table_safe(input$mag_table, id_col = "Name")
     })
     report <- reactive(mp_validate_mag(mag_table()))
     is_valid <- reactive(mp_is_valid(report()))
@@ -371,7 +376,7 @@ assembly_server <- function(id) {
     ns <- session$ns
 
     contigs <- reactive({ req(input$contig_lengths); .read_table_safe(input$contig_lengths) })
-    summary_tbl <- reactive({ req(input$assembly_summary); .read_table_safe(input$assembly_summary) })
+    summary_tbl <- reactive({ req(input$assembly_summary); .read_table_safe(input$assembly_summary, id_col = "Assembly_ID") })
 
     report <- reactive({
       if (input$plot_type == "nx") mp_validate_contig_lengths(contigs()) else mp_validate_assembly_summary(summary_tbl())
