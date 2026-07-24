@@ -10,9 +10,8 @@ format, same validator rules, same plot catalog.
 See [`data-format.md`](data-format.md) for the required input files. Full
 documentation (one article per plot: input spec, parameters, literature
 grounding) is a [pkgdown](https://pkgdown.r-lib.org/) site built from
-`vignettes/` into `docs/` — open `docs/index.html` locally, or serve it via
-GitHub Pages once this repo is published (`devtools::load_all();
-pkgdown::build_site()` to rebuild after any change).
+`vignettes/` into `docs/`, served via GitHub Pages once enabled for this
+repo (or open `docs/index.html` locally).
 
 ## Plot catalog
 
@@ -33,19 +32,21 @@ supports abundance/prevalence filtering via `mp_filter_taxa()`, and returns
 a plain `ggplot2` object you can extend further (`p + ggplot2::theme(...)`
 etc.) — nothing here is a static image.
 
-## Install (dev)
+## Install
 
 ```r
-devtools::install_deps()
-devtools::load_all()
-devtools::test()
+install.packages("remotes")
+remotes::install_github("l-gallucci/microplotR")
 ```
+
+Not yet on CRAN — once published there, this becomes a plain
+`install.packages("microplotr")`.
 
 ## Shiny app
 
 ```r
-devtools::load_all()
-shiny::runApp("inst/shiny")
+library(microplotr)
+shiny::runApp(system.file("shiny", package = "microplotr"))
 ```
 
 Four tabs (Taxonomy, Functional profile, MAG quality, Assembly QC), each:
@@ -53,15 +54,16 @@ upload the required file(s) → validator shows errors/warnings inline →
 pick a plot type and parameters → view/download the plot as PNG or SVG at
 a width/height you choose.
 
-## Quick usage (library)
+## Quick usage
 
 ```r
 library(microplotr)
 
+example_dir <- system.file("extdata", "example_valid", package = "microplotr")
 data <- mp_read_data(
-  "inst/extdata/example_valid/feature_table.tsv",
-  "inst/extdata/example_valid/taxonomy.tsv",
-  "inst/extdata/example_valid/metadata.tsv"
+  file.path(example_dir, "feature_table.tsv"),
+  file.path(example_dir, "taxonomy.tsv"),
+  file.path(example_dir, "metadata.tsv")
 )
 report <- mp_validate(data, gradient_column = "Depth_m", group_column = "Group")
 mp_is_valid(report)
@@ -69,6 +71,26 @@ mp_is_valid(report)
 mp_taxa_barplot(data, rank = "Genus", group_rank = "Phylum", top_n = 10)
 ```
 
-Try validation against `inst/extdata/example_broken_*` to see what it
-catches (ID mismatches, negative counts, missing taxonomy columns,
-duplicate feature IDs).
+The package ships several other bundled example datasets under
+`system.file("extdata", package = "microplotr")` — including
+`example_broken_*` sets that each trip a different validator check (ID
+mismatches, negative counts, missing taxonomy columns, duplicate feature
+IDs) — useful for seeing exactly what `mp_validate()` catches.
+
+## Contributing / development
+
+```r
+git clone https://github.com/l-gallucci/microplotR.git && cd microplotR
+```
+```r
+devtools::install_deps()
+devtools::load_all()
+devtools::test()
+```
+
+To rebuild the documentation site after a change:
+
+```r
+devtools::load_all()
+pkgdown::build_site()
+```

@@ -18,25 +18,34 @@ See `vignette("data-format")` for the required input files.
 ## Install
 
 ```r
-devtools::install_deps()
-devtools::load_all()
+install.packages("remotes")
+remotes::install_github("l-gallucci/microplotR")
 ```
 
 ## Quick start
 
+Point `mp_read_data()` at your own tidy files (see `vignette("data-format")`
+for the required columns), or try the bundled example dataset:
+
 ```r
 library(microplotr)
 
+example_dir <- system.file("extdata", "example_valid", package = "microplotr")
 data <- mp_read_data(
-  "inst/extdata/example_valid/feature_table.tsv",
-  "inst/extdata/example_valid/taxonomy.tsv",
-  "inst/extdata/example_valid/metadata.tsv"
+  file.path(example_dir, "feature_table.tsv"),
+  file.path(example_dir, "taxonomy.tsv"),
+  file.path(example_dir, "metadata.tsv")
 )
 report <- mp_validate(data, gradient_column = "Depth_m", group_column = "Group")
 mp_is_valid(report)
 
 mp_taxa_barplot(data, rank = "Genus", group_rank = "Phylum", top_n = 10)
 ```
+
+The package also ships `example_broken_*` datasets under
+`system.file("extdata", package = "microplotr")`, each tripping a different
+validator check (ID mismatches, negative counts, missing taxonomy columns,
+duplicate feature IDs).
 
 ## Shiny app
 
