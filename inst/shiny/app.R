@@ -11,19 +11,26 @@ library(bslib)
 
 .UPLOAD_ACCEPT <- c(".tsv", ".csv", ".rds")
 
-.read_table_safe <- function(fileinfo, id_col = NULL) {
+.read_table_safe <- function(fileinfo, id_col = NULL, rename = NULL) {
   # Shiny's uploaded file lands at a random-named temp path (fileinfo$datapath)
   # that does NOT preserve the original extension, but mp_read_table() picks
   # its parser (tsv/csv/rds) from the path's extension -- so copy to a temp
   # file named with the *original* (fileinfo$name) extension first, then
   # reuse the exact same reader the library itself uses. id_col is passed
   # through so an .rds matrix (e.g. a phyloseq otu_table()) gets its
-  # rownames promoted into the right ID column instead of erroring.
+  # rownames promoted into the right ID column instead of erroring; rename
+  # lets a column under a custom name (e.g. "SampleName") be renamed to the
+  # canonical one (e.g. "Sample_ID") the validators/plots expect.
   if (is.null(fileinfo)) return(NULL)
   ext <- tolower(tools::file_ext(fileinfo$name))
   tmp <- tempfile(fileext = paste0(".", ext))
   file.copy(fileinfo$datapath, tmp, overwrite = TRUE)
-  mp_read_table(tmp, id_col = id_col)
+  mp_read_table(tmp, id_col = id_col, rename = rename)
+}
+
+.id_rename <- function(actual, canonical) {
+  if (is.null(actual) || !nzchar(trimws(actual)) || identical(trimws(actual), canonical)) return(NULL)
+  stats::setNames(canonical, trimws(actual))
 }
 
 .validation_ui <- function(report) {
@@ -118,6 +125,10 @@ taxonomy_ui <- function(id) {
       fileInput(ns("feature_table"), "Feature table (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       fileInput(ns("taxonomy"), "Taxonomy (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       fileInput(ns("metadata"), "Metadata (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
+      textInput(ns("feature_id_column"), "Feature ID column name (if not \"Feature_ID\")",
+                placeholder = "Feature_ID"),
+      textInput(ns("sample_id_column"), "Sample ID column name (if not \"Sample_ID\")",
+                placeholder = "Sample_ID"),
       hr(),
       .filter_controls_ui(ns),
       hr(),
@@ -138,10 +149,12 @@ taxonomy_server <- function(id) {
 
     raw_data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
+      feature_rename <- .id_rename(input$feature_id_column, "Feature_ID")
+      sample_rename <- .id_rename(input$sample_id_column, "Sample_ID")
       list(
-        feature_table = .read_table_safe(input$feature_table, id_col = "Feature_ID"),
-        taxonomy = .read_table_safe(input$taxonomy, id_col = "Feature_ID"),
-        metadata = .read_table_safe(input$metadata, id_col = "Sample_ID")
+        feature_table = .read_table_safe(input$feature_table, id_col = "Feature_ID", rename = feature_rename),
+        taxonomy = .read_table_safe(input$taxonomy, id_col = "Feature_ID", rename = feature_rename),
+        metadata = .read_table_safe(input$metadata, id_col = "Sample_ID", rename = sample_rename)
       )
     })
 
