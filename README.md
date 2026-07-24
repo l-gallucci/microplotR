@@ -4,8 +4,8 @@ Literature-grounded, publication-ready microbial ecology plots from plain
 tidy input (feature table + taxonomy + metadata), with an upload-time
 validator that reports exactly what is wrong with your data, and a Shiny
 app for interactive use. Built on ggplot2. Python counterpart:
-[`microplotpy`](../microplotpy) — same input format, same validator rules,
-same plot catalog.
+[`microplotpy`](https://github.com/l-gallucci/microplotPy) — same input
+format, same validator rules, same plot catalog.
 
 See [`data-format.md`](data-format.md) for the required input files. Full
 documentation (one article per plot: input spec, parameters, literature
