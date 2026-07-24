@@ -81,6 +81,36 @@ library(bslib)
 
 # ---- Taxonomy module --------------------------------------------------------
 
+.parse_exclude_list <- function(txt) {
+  if (is.null(txt) || trimws(txt) == "") return(NULL)
+  terms <- trimws(strsplit(txt, ",")[[1]])
+  terms[nzchar(terms)]
+}
+
+.filter_controls_ui <- function(ns) {
+  tagList(
+    textInput(ns("exclude_taxa"), "Exclude taxa (comma-separated, any rank)",
+              placeholder = "e.g. Chloroplast, Mitochondria"),
+    checkboxInput(ns("remove_singletons"), "Remove singleton features (total count = 1)", value = FALSE),
+    numericInput(ns("min_total_count"), "Min total read count per feature", value = 0, min = 0),
+    uiOutput(ns("filter_summary"))
+  )
+}
+
+.filter_summary_ui <- function(summary) {
+  total <- summary[summary$reason == "total", ]
+  if (total$n_features_removed == 0) {
+    return(div(class = "alert alert-secondary", "No features removed."))
+  }
+  div(
+    class = "alert alert-info",
+    sprintf(
+      "Removed %d feature(s) (%.1f%% of features, %.1f%% of reads).",
+      total$n_features_removed, total$pct_features_removed, total$pct_reads_removed
+    )
+  )
+}
+
 taxonomy_ui <- function(id) {
   ns <- NS(id)
   sidebarLayout(
@@ -88,6 +118,9 @@ taxonomy_ui <- function(id) {
       fileInput(ns("feature_table"), "Feature table (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       fileInput(ns("taxonomy"), "Taxonomy (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
       fileInput(ns("metadata"), "Metadata (.tsv/.csv/.rds)", accept = .UPLOAD_ACCEPT),
+      hr(),
+      .filter_controls_ui(ns),
+      hr(),
       uiOutput(ns("validation")),
       hr(),
       uiOutput(ns("controls"))
@@ -103,13 +136,29 @@ taxonomy_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    data <- reactive({
+    raw_data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
       list(
         feature_table = .read_table_safe(input$feature_table, id_col = "Feature_ID"),
         taxonomy = .read_table_safe(input$taxonomy, id_col = "Feature_ID"),
         metadata = .read_table_safe(input$metadata, id_col = "Sample_ID")
       )
+    })
+
+    filtered <- reactive({
+      mp_filter_features(
+        raw_data(),
+        exclude_taxa = .parse_exclude_list(input$exclude_taxa),
+        remove_singletons = isTRUE(input$remove_singletons),
+        min_total_count = input$min_total_count %||% 0
+      )
+    })
+
+    data <- reactive(filtered()$data)
+
+    output$filter_summary <- renderUI({
+      req(raw_data())
+      .filter_summary_ui(filtered()$summary)
     })
 
     report <- reactive(mp_validate(data()))

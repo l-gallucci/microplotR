@@ -4,7 +4,13 @@
 \alias{mp_read_data}
 \title{Read tidy microbiome input files}
 \usage{
-mp_read_data(feature_table_path, taxonomy_path, metadata_path)
+mp_read_data(
+  feature_table_path,
+  taxonomy_path,
+  metadata_path,
+  feature_id_column = "Feature_ID",
+  sample_id_column = "Sample_ID"
+)
 }
 \arguments{
 \item{feature_table_path}{Path to feature_table.tsv/.csv/.rds.}
@@ -12,6 +18,13 @@ mp_read_data(feature_table_path, taxonomy_path, metadata_path)
 \item{taxonomy_path}{Path to taxonomy.tsv/.csv/.rds.}
 
 \item{metadata_path}{Path to metadata.tsv/.csv/.rds.}
+
+\item{feature_id_column}{Actual name of the feature-ID column in
+\code{feature_table_path}/\code{taxonomy_path}, if not already \code{"Feature_ID"}.}
+
+\item{sample_id_column}{Actual name of the sample-ID column in
+\code{metadata_path} (and \code{feature_table_path}'s header row, for tsv/csv),
+if not already \code{"Sample_ID"}.}
 }
 \value{
 A list with \code{feature_table}, \code{taxonomy}, \code{metadata} tibbles.
@@ -20,4 +33,19 @@ A list with \code{feature_table}, \code{taxonomy}, \code{metadata} tibbles.
 Reads the three tidy input files as character-typed tibbles (no
 validation, no type coercion) so \code{\link[=mp_validate]{mp_validate()}} can distinguish
 "not numeric" from "numeric" without prior silent coercion.
+}
+\details{
+Two common real-world mismatches are handled automatically:
+\itemize{
+\item \strong{Custom ID column names.} If your files use something other than
+\code{Feature_ID}/\code{Sample_ID} (e.g. a sample sheet with a \code{SampleName}
+column), pass its actual name via \code{feature_id_column}/
+\code{sample_id_column} and it's renamed to the canonical name on read --
+no need to edit the file itself.
+\item \strong{Transposed feature tables.} Tools like dada2 (\code{seqtab.rds}) or a
+\code{phyloseq::otu_table()} sometimes save samples x features instead of
+features x samples. When \code{feature_table_path} is a \code{.rds} matrix, its
+orientation is checked against the (already-read) taxonomy/metadata
+ID sets and transposed back if that's a clearly better fit.
+}
 }

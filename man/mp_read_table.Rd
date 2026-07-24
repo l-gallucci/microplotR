@@ -4,7 +4,7 @@
 \alias{mp_read_table}
 \title{Read a single tidy table (.tsv, .csv, or .rds)}
 \usage{
-mp_read_table(path, id_col = NULL)
+mp_read_table(path, id_col = NULL, rename = NULL)
 }
 \arguments{
 \item{path}{Path to the file. For a Shiny \code{fileInput}, pass the
@@ -22,6 +22,11 @@ column): the matrix is converted to a data frame and, if it doesn't
 already have a column named \code{id_col}, its rownames are promoted into
 one. Leave \code{NULL} to skip that promotion (rownames are dropped as
 usual, matching plain \code{as.data.frame()} behavior).}
+
+\item{rename}{Optional named character vector, \code{c(actual_name = "canonical_name")}, for renaming one or more columns on read -- e.g.
+\code{c(SampleName = "Sample_ID")} if your metadata's ID column isn't
+already called \code{Sample_ID}. Applied before \code{id_col} promotion, and
+never overwrites a column that's already named \code{canonical_name}.}
 }
 \value{
 A tibble (or data frame, for \code{.rds}) with character columns.

@@ -74,6 +74,83 @@ test_that("mp_read_table does not duplicate id_col if the matrix already has it 
   expect_equal(sum(names(df) == "Feature_ID"), 1)
 })
 
+test_that("mp_read_table renames a custom-named column to the canonical name", {
+  path <- file.path(example_dir("example_valid"), "metadata.tsv")
+  ref <- readr::read_delim(path, delim = "\t", show_col_types = FALSE)
+  names(ref)[names(ref) == "Sample_ID"] <- "SampleName"
+
+  tsv_path <- tempfile(fileext = ".tsv")
+  readr::write_tsv(ref, tsv_path)
+
+  df <- mp_read_table(tsv_path, rename = c(SampleName = "Sample_ID"))
+  expect_true("Sample_ID" %in% names(df))
+  expect_false("SampleName" %in% names(df))
+})
+
+test_that("mp_read_table rename never clobbers an existing canonical column", {
+  df_in <- data.frame(Sample_ID = c("S1", "S2"), SampleName = c("x", "y"), stringsAsFactors = FALSE)
+  rds_path <- tempfile(fileext = ".rds")
+  saveRDS(df_in, rds_path)
+
+  df <- mp_read_table(rds_path, rename = c(SampleName = "Sample_ID"))
+  expect_equal(sum(names(df) == "Sample_ID"), 1)
+  expect_true("SampleName" %in% names(df))
+})
+
+test_that("mp_read_data renames custom feature/sample ID columns end to end", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+  tax_ref <- readr::read_delim(file.path(d, "taxonomy.tsv"), delim = "\t", show_col_types = FALSE)
+  meta_ref <- readr::read_delim(file.path(d, "metadata.tsv"), delim = "\t", show_col_types = FALSE)
+
+  names(ft_ref)[names(ft_ref) == "Feature_ID"] <- "ASV_ID"
+  names(tax_ref)[names(tax_ref) == "Feature_ID"] <- "ASV_ID"
+  names(meta_ref)[names(meta_ref) == "Sample_ID"] <- "SampleName"
+
+  ft_path <- tempfile(fileext = ".tsv"); readr::write_tsv(ft_ref, ft_path)
+  tax_path <- tempfile(fileext = ".tsv"); readr::write_tsv(tax_ref, tax_path)
+  meta_path <- tempfile(fileext = ".tsv"); readr::write_tsv(meta_ref, meta_path)
+
+  data <- mp_read_data(ft_path, tax_path, meta_path,
+                        feature_id_column = "ASV_ID", sample_id_column = "SampleName")
+  expect_true("Feature_ID" %in% names(data$feature_table))
+  expect_true("Feature_ID" %in% names(data$taxonomy))
+  expect_true("Sample_ID" %in% names(data$metadata))
+  report <- mp_validate(data)
+  expect_true(mp_is_valid(report))
+})
+
+test_that("mp_read_data transposes a samples x features matrix back to features x samples", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+
+  # samples x features matrix, e.g. dada2::seqtab -- the opposite orientation
+  ft_mat <- t(as.matrix(ft_ref[setdiff(names(ft_ref), "Feature_ID")]))
+  colnames(ft_mat) <- ft_ref$Feature_ID
+  ft_rds <- tempfile(fileext = ".rds")
+  saveRDS(ft_mat, ft_rds)
+
+  data <- mp_read_data(ft_rds, file.path(d, "taxonomy.tsv"), file.path(d, "metadata.tsv"))
+  expect_true("Feature_ID" %in% names(data$feature_table))
+  expect_setequal(data$feature_table$Feature_ID, ft_ref$Feature_ID)
+  expect_setequal(setdiff(names(data$feature_table), "Feature_ID"), setdiff(names(ft_ref), "Feature_ID"))
+  report <- mp_validate(data)
+  expect_true(mp_is_valid(report))
+})
+
+test_that("mp_read_data leaves an already-correct orientation matrix alone", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+
+  ft_mat <- as.matrix(ft_ref[setdiff(names(ft_ref), "Feature_ID")])
+  rownames(ft_mat) <- ft_ref$Feature_ID
+  ft_rds <- tempfile(fileext = ".rds")
+  saveRDS(ft_mat, ft_rds)
+
+  data <- mp_read_data(ft_rds, file.path(d, "taxonomy.tsv"), file.path(d, "metadata.tsv"))
+  expect_equal(sort(data$feature_table$Feature_ID), sort(ft_ref$Feature_ID))
+})
+
 test_that("mp_read_data reads a phyloseq-style otu_table matrix end to end", {
   d <- example_dir("example_valid")
   ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
