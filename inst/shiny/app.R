@@ -11,26 +11,34 @@ library(bslib)
 
 .UPLOAD_ACCEPT <- c(".tsv", ".csv", ".rds")
 
-.read_table_safe <- function(fileinfo, id_col = NULL, rename = NULL) {
+.tmp_path_for <- function(fileinfo) {
   # Shiny's uploaded file lands at a random-named temp path (fileinfo$datapath)
-  # that does NOT preserve the original extension, but mp_read_table() picks
-  # its parser (tsv/csv/rds) from the path's extension -- so copy to a temp
-  # file named with the *original* (fileinfo$name) extension first, then
-  # reuse the exact same reader the library itself uses. id_col is passed
-  # through so an .rds matrix (e.g. a phyloseq otu_table()) gets its
-  # rownames promoted into the right ID column instead of erroring; rename
-  # lets a column under a custom name (e.g. "SampleName") be renamed to the
-  # canonical one (e.g. "Sample_ID") the validators/plots expect.
+  # that does NOT preserve the original extension, but mp_read_table()/
+  # mp_read_data() pick their parser (tsv/csv/rds) from the path's extension
+  # -- so copy to a temp file named with the *original* (fileinfo$name)
+  # extension first.
   if (is.null(fileinfo)) return(NULL)
   ext <- tolower(tools::file_ext(fileinfo$name))
   tmp <- tempfile(fileext = paste0(".", ext))
   file.copy(fileinfo$datapath, tmp, overwrite = TRUE)
+  tmp
+}
+
+.read_table_safe <- function(fileinfo, id_col = NULL, rename = NULL) {
+  # id_col promotes an .rds matrix's rownames into the right ID column
+  # (e.g. a phyloseq otu_table()) instead of erroring; rename lets a
+  # column under a custom name (e.g. "SampleName") be renamed to the
+  # canonical one (e.g. "Sample_ID") the validators/plots expect. Only
+  # single-file reads -- the taxonomy module uses mp_read_data() directly
+  # instead, since that's also where transposed-feature-table detection
+  # lives (it needs all three files' ID sets to check orientation against).
+  tmp <- .tmp_path_for(fileinfo)
+  if (is.null(tmp)) return(NULL)
   mp_read_table(tmp, id_col = id_col, rename = rename)
 }
 
-.id_rename <- function(actual, canonical) {
-  if (is.null(actual) || !nzchar(trimws(actual)) || identical(trimws(actual), canonical)) return(NULL)
-  stats::setNames(canonical, trimws(actual))
+.effective_id_column <- function(actual, default) {
+  if (is.null(actual) || !nzchar(trimws(actual))) default else trimws(actual)
 }
 
 .validation_ui <- function(report) {
@@ -149,12 +157,12 @@ taxonomy_server <- function(id) {
 
     raw_data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
-      feature_rename <- .id_rename(input$feature_id_column, "Feature_ID")
-      sample_rename <- .id_rename(input$sample_id_column, "Sample_ID")
-      list(
-        feature_table = .read_table_safe(input$feature_table, id_col = "Feature_ID", rename = feature_rename),
-        taxonomy = .read_table_safe(input$taxonomy, id_col = "Feature_ID", rename = feature_rename),
-        metadata = .read_table_safe(input$metadata, id_col = "Sample_ID", rename = sample_rename)
+      mp_read_data(
+        .tmp_path_for(input$feature_table),
+        .tmp_path_for(input$taxonomy),
+        .tmp_path_for(input$metadata),
+        feature_id_column = .effective_id_column(input$feature_id_column, "Feature_ID"),
+        sample_id_column = .effective_id_column(input$sample_id_column, "Sample_ID")
       )
     })
 
