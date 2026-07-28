@@ -125,6 +125,16 @@ options(shiny.maxRequestSize = 500 * 1024^2)
   )
 }
 
+.fmt_pct <- function(x) {
+  # A fixed 1-decimal format rounds anything under 0.05% down to "0.0%",
+  # which reads as "nothing happened" even when features really were
+  # removed (contaminants/singletons are often a tiny fraction of total
+  # reads by nature, not a sign the filter silently no-op'd).
+  if (x == 0) return("0%")
+  if (x < 1) return(sprintf("%.3f%%", x))
+  sprintf("%.1f%%", x)
+}
+
 .filter_summary_ui <- function(summary) {
   total <- summary[summary$reason == "total", ]
   if (total$n_features_removed == 0) {
@@ -133,8 +143,8 @@ options(shiny.maxRequestSize = 500 * 1024^2)
   div(
     class = "alert alert-info",
     sprintf(
-      "Removed %d feature(s) (%.1f%% of features, %.1f%% of reads).",
-      total$n_features_removed, total$pct_features_removed, total$pct_reads_removed
+      "Removed %d feature(s) (%s of features, %s of reads).",
+      total$n_features_removed, .fmt_pct(total$pct_features_removed), .fmt_pct(total$pct_reads_removed)
     )
   )
 }
@@ -150,6 +160,11 @@ taxonomy_ui <- function(id) {
                 placeholder = "Feature_ID"),
       textInput(ns("sample_id_column"), "Sample ID column name (if not \"Sample_ID\")",
                 placeholder = "Sample_ID"),
+      selectInput(ns("feature_table_orientation"), "Feature table orientation",
+                  choices = c("Auto-detect" = "auto",
+                              "Features are rows, samples are columns" = "asis",
+                              "Samples are rows, features are columns (transposed)" = "transpose"),
+                  selected = "auto"),
       hr(),
       .filter_controls_ui(ns),
       hr(),
@@ -170,12 +185,15 @@ taxonomy_server <- function(id) {
 
     raw_data <- reactive({
       req(input$feature_table, input$taxonomy, input$metadata)
+      transpose_override <- switch(input$feature_table_orientation %||% "auto",
+                                    asis = FALSE, transpose = TRUE, NULL)
       mp_read_data(
         .tmp_path_for(input$feature_table),
         .tmp_path_for(input$taxonomy),
         .tmp_path_for(input$metadata),
         feature_id_column = .effective_id_column(input$feature_id_column, "Feature_ID"),
-        sample_id_column = .effective_id_column(input$sample_id_column, "Sample_ID")
+        sample_id_column = .effective_id_column(input$sample_id_column, "Sample_ID"),
+        feature_table_transpose = transpose_override
       )
     })
 
@@ -249,7 +267,19 @@ taxonomy_server <- function(id) {
         ),
         conditionalPanel(
           condition = sprintf("input['%s'] == 'gradient'", ns("plot_type")),
-          selectInput(ns("gradient_var"), "Gradient variable (numeric)", choices = nmc)
+          selectInput(ns("gradient_var"), "Gradient variable (numeric)", choices = nmc),
+          selectizeInput(ns("gradient_taxa"), "Specific taxa to plot (optional, overrides Top N)",
+                          choices = {
+                            current_rank <- input$rank %||% (if ("Genus" %in% tc) "Genus" else tc[1])
+                            tax <- data()$taxonomy
+                            if (current_rank %in% names(tax)) {
+                              sort(unique(stats::na.omit(tax[[current_rank]])))
+                            } else {
+                              character(0)
+                            }
+                          },
+                          multiple = TRUE,
+                          options = list(placeholder = "Leave empty to use Top N ranking"))
         ),
         conditionalPanel(
           condition = sprintf("input['%s'] == 'alpha' || input['%s'] == 'beta'", ns("plot_type"), ns("plot_type")),
@@ -283,8 +313,9 @@ taxonomy_server <- function(id) {
                                          long = long_data()),
         gradient = {
           req(input$gradient_var)
+          gradient_taxa <- if (length(input$gradient_taxa) > 0) input$gradient_taxa else NULL
           mp_asv_gradient_plot(d, gradient_var = input$gradient_var, rank = input$rank,
-                                group_rank = gr, top_n = input$top_n,
+                                group_rank = gr, top_n = input$top_n, taxa = gradient_taxa,
                                 min_rel_abund = mra, min_prevalence = mp, detection = det,
                                 long = long_data())
         },

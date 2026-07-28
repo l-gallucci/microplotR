@@ -42,7 +42,16 @@
 
 #' Turn a raw `.mp_read_raw()` result into the finalized character data
 #' frame `mp_read_table()`/`mp_read_data()` return: matrix -> data frame,
-#' column rename, rowname -> `id_col` promotion, character coercion.
+#' column rename, ID column promotion, character coercion.
+#'
+#' ID column promotion tries three things, in order, whenever `id_col`
+#' isn't already a column name after `rename`: (1) a matrix's `rownames()`
+#' (e.g. a `phyloseq::otu_table()`); (2) a genuinely headerless first
+#' column from a tsv/csv -- readr names a blank header `"...1"`, which is
+#' how a real absence of a header (not just an unexpected name already
+#' covered by `rename`) is told apart from an ordinary data column; (3) as
+#' a last resort, an unnamed/auto-numbered first column surviving from
+#' `check.names=FALSE` on a matrix (`"V1"`/`""`) -- same idea, `.rds` side.
 #' @keywords internal
 #' @noRd
 .mp_finalize_table <- function(obj, path, id_col = NULL, rename = NULL) {
@@ -62,30 +71,61 @@
     if (has_named_rows) {
       obj <- cbind(setNames(data.frame(rn, stringsAsFactors = FALSE), id_col), obj)
       rownames(obj) <- NULL
+    } else if (ncol(obj) > 0 && grepl("^(\\.\\.\\.1|V1|)$", names(obj)[1])) {
+      names(obj)[1] <- id_col
     }
   }
 
   as.data.frame(lapply(obj, as.character), stringsAsFactors = FALSE, check.names = FALSE)
 }
 
-#' If a matrix's rows/columns are swapped relative to known feature/sample
-#' IDs (e.g. dada2's `seqtab.rds`, which comes out samples x ASVs -- the
-#' opposite of the features x samples this package expects), flip it back.
-#' No-op for anything but a matrix with both dimnames set, or when neither
-#' orientation is a clearly better fit (e.g. IDs not yet known, or a
-#' fresh/tiny table with no overlap either way).
+#' Transpose a matrix or a first-column-is-the-ID data frame/tibble,
+#' returning a matrix either way (dimnames set from the ID column/rownames
+#' and the other axis's names) -- `.mp_finalize_table()` already knows how
+#' to turn a matrix's rownames back into a proper ID column.
 #' @keywords internal
 #' @noRd
-.mp_maybe_transpose <- function(obj, feature_ids, sample_ids) {
-  if (!is.matrix(obj) || is.null(rownames(obj)) || is.null(colnames(obj))) return(obj)
+.mp_transpose_2d <- function(obj) {
+  if (is.matrix(obj)) return(t(obj))
+  mat <- as.matrix(obj[-1])
+  rownames(mat) <- as.character(obj[[1]])
+  t(mat)
+}
+
+#' If a table's rows/columns are swapped relative to known feature/sample
+#' IDs (e.g. dada2's `seqtab.rds`, which comes out samples x ASVs -- the
+#' opposite of the features x samples this package expects), flip it back.
+#' Works on a `.rds` matrix (rownames/colnames) or a tsv/csv-style data
+#' frame/tibble (first column's values vs. the other columns' headers).
+#'
+#' @param force `NULL` (default) auto-detects by scoring both orientations
+#'   against `feature_ids`/`sample_ids` and picking whichever is a clearly
+#'   better fit (a no-op if IDs aren't known yet, e.g. a fresh/tiny table
+#'   with no overlap either way). `TRUE`/`FALSE` skips scoring and always
+#'   (never) transposes -- for a manual override when auto-detection can't
+#'   confidently decide.
+#' @keywords internal
+#' @noRd
+.mp_maybe_transpose <- function(obj, feature_ids, sample_ids, force = NULL) {
+  if (isTRUE(force)) return(.mp_transpose_2d(obj))
+  if (isFALSE(force)) return(obj)
+
+  if (is.matrix(obj)) {
+    rn <- rownames(obj)
+    cn <- colnames(obj)
+  } else if (is.data.frame(obj) && ncol(obj) >= 2) {
+    rn <- as.character(obj[[1]])
+    cn <- names(obj)[-1]
+  } else {
+    return(obj)
+  }
+  if (is.null(rn) || is.null(cn)) return(obj)
   if (length(feature_ids) == 0 || length(sample_ids) == 0) return(obj)
 
-  rn <- rownames(obj)
-  cn <- colnames(obj)
   as_is_score <- length(intersect(rn, feature_ids)) + length(intersect(cn, sample_ids))
   flipped_score <- length(intersect(rn, sample_ids)) + length(intersect(cn, feature_ids))
 
-  if (flipped_score > as_is_score) t(obj) else obj
+  if (flipped_score > as_is_score) .mp_transpose_2d(obj) else obj
 }
 
 #' Read tidy microbiome input files
@@ -94,17 +134,23 @@
 #' validation, no type coercion) so [mp_validate()] can distinguish
 #' "not numeric" from "numeric" without prior silent coercion.
 #'
-#' Two common real-world mismatches are handled automatically:
+#' Several common real-world mismatches are handled automatically:
 #' - **Custom ID column names.** If your files use something other than
 #'   `Feature_ID`/`Sample_ID` (e.g. a sample sheet with a `SampleName`
 #'   column), pass its actual name via `feature_id_column`/
 #'   `sample_id_column` and it's renamed to the canonical name on read --
 #'   no need to edit the file itself.
+#' - **Headerless ID column.** If the ID column has no header at all (a
+#'   blank leading cell, common in matrix-style exports), it's promoted
+#'   automatically regardless of `feature_id_column`/`sample_id_column`.
 #' - **Transposed feature tables.** Tools like dada2 (`seqtab.rds`) or a
 #'   `phyloseq::otu_table()` sometimes save samples x features instead of
-#'   features x samples. When `feature_table_path` is a `.rds` matrix, its
-#'   orientation is checked against the (already-read) taxonomy/metadata
-#'   ID sets and transposed back if that's a clearly better fit.
+#'   features x samples -- this applies to a `.rds` matrix or a tsv/csv
+#'   table alike. Orientation is checked against the (already-read)
+#'   taxonomy/metadata ID sets and transposed back if that's a clearly
+#'   better fit; set `feature_table_transpose` to `TRUE`/`FALSE` to
+#'   override the automatic check (e.g. for a dataset too small for the
+#'   ID-overlap heuristic to confidently decide).
 #'
 #' @param feature_table_path Path to feature_table.tsv/.csv/.rds.
 #' @param taxonomy_path Path to taxonomy.tsv/.csv/.rds.
@@ -114,10 +160,14 @@
 #' @param sample_id_column Actual name of the sample-ID column in
 #'   `metadata_path` (and `feature_table_path`'s header row, for tsv/csv),
 #'   if not already `"Sample_ID"`.
+#' @param feature_table_transpose `NULL` (default) auto-detects whether
+#'   `feature_table_path` needs transposing (see above). Set `TRUE` to
+#'   force a transpose or `FALSE` to force leaving it as-is.
 #' @return A list with `feature_table`, `taxonomy`, `metadata` tibbles.
 #' @export
 mp_read_data <- function(feature_table_path, taxonomy_path, metadata_path,
-                          feature_id_column = "Feature_ID", sample_id_column = "Sample_ID") {
+                          feature_id_column = "Feature_ID", sample_id_column = "Sample_ID",
+                          feature_table_transpose = NULL) {
   feature_rename <- .mp_id_rename(feature_id_column, "Feature_ID")
   sample_rename <- .mp_id_rename(sample_id_column, "Sample_ID")
 
@@ -127,7 +177,8 @@ mp_read_data <- function(feature_table_path, taxonomy_path, metadata_path,
   ft_raw <- .mp_maybe_transpose(
     .mp_read_raw(feature_table_path),
     feature_ids = taxonomy$Feature_ID,
-    sample_ids = metadata$Sample_ID
+    sample_ids = metadata$Sample_ID,
+    force = feature_table_transpose
   )
   feature_table <- .mp_finalize_table(ft_raw, feature_table_path, id_col = "Feature_ID", rename = feature_rename)
 

@@ -24,7 +24,13 @@
 #' @param top_n Number of `rank` taxa to show (ranked by total relative
 #'   abundance among taxa passing `min_rel_abund`/`min_prevalence`); the
 #'   rest are pooled into `other_label`. `NULL` shows every taxon that
-#'   passes the filters, uncapped.
+#'   passes the filters, uncapped. Ignored if `taxa` is given.
+#' @param taxa Optional character vector of exact `rank` values to show
+#'   (e.g. `"Escherichia"` for a single taxon's gradient, or a short
+#'   explicit list) -- bypasses `top_n`/`min_rel_abund`/`min_prevalence`
+#'   ranking entirely and shows exactly these taxa (any not present in the
+#'   data are silently ignored). `NULL` (default) falls back to the
+#'   `top_n`-ranked selection.
 #' @param min_rel_abund,min_prevalence,detection See [mp_taxa_barplot()].
 #' @param facet Facet into one panel per taxon (small multiples) instead of
 #'   overlaying all taxa in one panel with a color legend.
@@ -46,6 +52,7 @@ mp_asv_gradient_plot <- function(data,
                                   rank = "Genus",
                                   group_rank = "Phylum",
                                   top_n = 10,
+                                  taxa = NULL,
                                   min_rel_abund = 0,
                                   min_prevalence = 0,
                                   detection = 0,
@@ -78,7 +85,13 @@ mp_asv_gradient_plot <- function(data,
     dplyr::group_by(dplyr::across(dplyr::all_of(rank))) |>
     dplyr::summarise(total = sum(.data$rel_abund), .groups = "drop") |>
     dplyr::arrange(dplyr::desc(.data$total))
-  keep <- if (is.null(top_n)) totals[[rank]] else utils::head(totals[[rank]], top_n)
+  keep <- if (!is.null(taxa)) {
+    intersect(taxa, unique(agg[[rank]]))
+  } else if (is.null(top_n)) {
+    totals[[rank]]
+  } else {
+    utils::head(totals[[rank]], top_n)
+  }
 
   agg$.taxon <- ifelse(agg[[rank]] %in% keep, agg[[rank]], other_label)
   if (!is.null(group_rank)) {
@@ -131,7 +144,13 @@ mp_asv_gradient_plot <- function(data,
     mp_theme_pub()
 
   if (!is.null(group_rank)) {
-    p <- p + ggplot2::theme(legend.text = ggtext::element_markdown(size = ggplot2::rel(0.8)))
+    # Same 2-line "**Group**<br>taxon" legend labels as mp_taxa_barplot() --
+    # needs the taller key height for the same reason (see there).
+    p <- p + ggplot2::theme(
+      legend.text = ggtext::element_markdown(size = ggplot2::rel(0.8), lineheight = 1.1),
+      legend.key.height = grid::unit(1.8, "lines"),
+      legend.spacing.y = grid::unit(0.15, "lines")
+    )
   }
 
   if (smooth) {

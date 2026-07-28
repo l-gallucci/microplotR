@@ -10,6 +10,7 @@ mp_asv_gradient_plot(
   rank = "Genus",
   group_rank = "Phylum",
   top_n = 10,
+  taxa = NULL,
   min_rel_abund = 0,
   min_prevalence = 0,
   detection = 0,
@@ -37,7 +38,14 @@ Set \code{NULL} for a flat legend.}
 \item{top_n}{Number of \code{rank} taxa to show (ranked by total relative
 abundance among taxa passing \code{min_rel_abund}/\code{min_prevalence}); the
 rest are pooled into \code{other_label}. \code{NULL} shows every taxon that
-passes the filters, uncapped.}
+passes the filters, uncapped. Ignored if \code{taxa} is given.}
+
+\item{taxa}{Optional character vector of exact \code{rank} values to show
+(e.g. \code{"Escherichia"} for a single taxon's gradient, or a short
+explicit list) -- bypasses \code{top_n}/\code{min_rel_abund}/\code{min_prevalence}
+ranking entirely and shows exactly these taxa (any not present in the
+data are silently ignored). \code{NULL} (default) falls back to the
+\code{top_n}-ranked selection.}
 
 \item{min_rel_abund, min_prevalence, detection}{See \code{\link[=mp_taxa_barplot]{mp_taxa_barplot()}}.}
 

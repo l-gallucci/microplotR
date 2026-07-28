@@ -182,3 +182,75 @@ test_that("mp_read_data works end to end with a mix of tsv/csv/rds inputs", {
   report <- mp_validate(data)
   expect_true(mp_is_valid(report))
 })
+
+test_that("mp_read_table promotes a genuinely headerless (blank) first column in a tsv", {
+  path <- tempfile(fileext = ".tsv")
+  writeLines(c("\tS1\tS2", "F1\t1\t2", "F2\t3\t4"), path)
+
+  df <- mp_read_table(path, id_col = "Feature_ID")
+  expect_equal(names(df)[1], "Feature_ID")
+  expect_equal(df$Feature_ID, c("F1", "F2"))
+})
+
+test_that("mp_read_table does not mistake a real header for a blank one", {
+  path <- tempfile(fileext = ".tsv")
+  writeLines(c("Feature_ID\tS1\tS2", "F1\t1\t2"), path)
+
+  df <- mp_read_table(path, id_col = "Feature_ID")
+  expect_equal(names(df)[1], "Feature_ID")
+})
+
+test_that("mp_read_data transposes a samples x features TSV/CSV (not just .rds matrix)", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+
+  # transpose to samples-as-rows, features-as-columns, as a flat tsv --
+  # first column becomes the (unlabeled here) sample axis
+  ft_mat <- as.matrix(ft_ref[setdiff(names(ft_ref), "Feature_ID")])
+  rownames(ft_mat) <- ft_ref$Feature_ID
+  ft_t <- as.data.frame(t(ft_mat), check.names = FALSE)
+  ft_t <- cbind(Sample_ID = rownames(ft_t), ft_t, stringsAsFactors = FALSE)
+  ft_path <- tempfile(fileext = ".tsv")
+  readr::write_tsv(ft_t, ft_path)
+
+  data <- mp_read_data(ft_path, file.path(d, "taxonomy.tsv"), file.path(d, "metadata.tsv"))
+  expect_true("Feature_ID" %in% names(data$feature_table))
+  expect_setequal(data$feature_table$Feature_ID, ft_ref$Feature_ID)
+  report <- mp_validate(data)
+  expect_true(mp_is_valid(report))
+})
+
+test_that("mp_read_data feature_table_transpose = FALSE overrides auto-detection", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+
+  ft_mat <- as.matrix(ft_ref[setdiff(names(ft_ref), "Feature_ID")])
+  rownames(ft_mat) <- ft_ref$Feature_ID
+  ft_t <- as.data.frame(t(ft_mat), check.names = FALSE)
+  ft_t <- cbind(Sample_ID = rownames(ft_t), ft_t, stringsAsFactors = FALSE)
+  ft_path <- tempfile(fileext = ".tsv")
+  readr::write_tsv(ft_t, ft_path)
+
+  # forced FALSE: left as-is (still samples x features), so Feature_ID
+  # promoted from the header row would just be "Sample_ID" -- not a match
+  # to the real Feature_ID set
+  data <- mp_read_data(ft_path, file.path(d, "taxonomy.tsv"), file.path(d, "metadata.tsv"),
+                        feature_table_transpose = FALSE)
+  expect_false(setequal(data$feature_table$Feature_ID, ft_ref$Feature_ID))
+})
+
+test_that("mp_read_data feature_table_transpose = TRUE forces a transpose", {
+  d <- example_dir("example_valid")
+  ft_ref <- readr::read_delim(file.path(d, "feature_table.tsv"), delim = "\t", show_col_types = FALSE)
+
+  ft_mat <- as.matrix(ft_ref[setdiff(names(ft_ref), "Feature_ID")])
+  rownames(ft_mat) <- ft_ref$Feature_ID
+  ft_rds <- tempfile(fileext = ".rds")
+  saveRDS(ft_mat, ft_rds)  # already correctly oriented
+
+  # forcing TRUE on an already-correct orientation should flip it the
+  # wrong way -- proves force actually bypasses the auto-detect scoring
+  data <- mp_read_data(ft_rds, file.path(d, "taxonomy.tsv"), file.path(d, "metadata.tsv"),
+                        feature_table_transpose = TRUE)
+  expect_false(setequal(data$feature_table$Feature_ID, ft_ref$Feature_ID))
+})

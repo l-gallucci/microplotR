@@ -168,7 +168,15 @@ mp_taxa_barplot <- function(data,
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
 
   p <- p + if (nested_legend) {
-    ggplot2::theme(legend.text = ggtext::element_markdown(size = ggplot2::rel(0.8)))
+    # Group-header entries are a 2-line label ("**Group**<br>taxon") in a
+    # single legend key, but mp_theme_pub()'s legend.key.size is sized for
+    # one line -- without a taller key here, that second line spills into
+    # the key square of the *next* row.
+    ggplot2::theme(
+      legend.text = ggtext::element_markdown(size = ggplot2::rel(0.8), lineheight = 1.1),
+      legend.key.height = grid::unit(1.8, "lines"),
+      legend.spacing.y = grid::unit(0.15, "lines")
+    )
   } else {
     ggplot2::theme(legend.text = ggplot2::element_text(size = ggplot2::rel(0.8)))
   }

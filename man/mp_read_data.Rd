@@ -9,7 +9,8 @@ mp_read_data(
   taxonomy_path,
   metadata_path,
   feature_id_column = "Feature_ID",
-  sample_id_column = "Sample_ID"
+  sample_id_column = "Sample_ID",
+  feature_table_transpose = NULL
 )
 }
 \arguments{
@@ -25,6 +26,10 @@ mp_read_data(
 \item{sample_id_column}{Actual name of the sample-ID column in
 \code{metadata_path} (and \code{feature_table_path}'s header row, for tsv/csv),
 if not already \code{"Sample_ID"}.}
+
+\item{feature_table_transpose}{\code{NULL} (default) auto-detects whether
+\code{feature_table_path} needs transposing (see above). Set \code{TRUE} to
+force a transpose or \code{FALSE} to force leaving it as-is.}
 }
 \value{
 A list with \code{feature_table}, \code{taxonomy}, \code{metadata} tibbles.
@@ -35,17 +40,23 @@ validation, no type coercion) so \code{\link[=mp_validate]{mp_validate()}} can d
 "not numeric" from "numeric" without prior silent coercion.
 }
 \details{
-Two common real-world mismatches are handled automatically:
+Several common real-world mismatches are handled automatically:
 \itemize{
 \item \strong{Custom ID column names.} If your files use something other than
 \code{Feature_ID}/\code{Sample_ID} (e.g. a sample sheet with a \code{SampleName}
 column), pass its actual name via \code{feature_id_column}/
 \code{sample_id_column} and it's renamed to the canonical name on read --
 no need to edit the file itself.
+\item \strong{Headerless ID column.} If the ID column has no header at all (a
+blank leading cell, common in matrix-style exports), it's promoted
+automatically regardless of \code{feature_id_column}/\code{sample_id_column}.
 \item \strong{Transposed feature tables.} Tools like dada2 (\code{seqtab.rds}) or a
 \code{phyloseq::otu_table()} sometimes save samples x features instead of
-features x samples. When \code{feature_table_path} is a \code{.rds} matrix, its
-orientation is checked against the (already-read) taxonomy/metadata
-ID sets and transposed back if that's a clearly better fit.
+features x samples -- this applies to a \code{.rds} matrix or a tsv/csv
+table alike. Orientation is checked against the (already-read)
+taxonomy/metadata ID sets and transposed back if that's a clearly
+better fit; set \code{feature_table_transpose} to \code{TRUE}/\code{FALSE} to
+override the automatic check (e.g. for a dataset too small for the
+ID-overlap heuristic to confidently decide).
 }
 }
