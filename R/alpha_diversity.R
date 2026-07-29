@@ -35,7 +35,17 @@ mp_alpha_diversity_plot <- function(data,
                                names_to = "metric", values_to = "value")
   long$metric <- factor(long$metric, levels = metrics_present)
   long <- dplyr::left_join(long, data$metadata[, c("Sample_ID", group_var)], by = "Sample_ID")
-  long[[group_var]] <- as.factor(long[[group_var]])
+
+  # Samples with no group_var value can't be grouped/tested -- drop them
+  # rather than let a phantom "NA" group show up as its own box/facet and
+  # silently skew the group count the Wilcoxon/Kruskal-Wallis choice below
+  # is based on.
+  is_missing <- is.na(long[[group_var]]) | trimws(as.character(long[[group_var]])) == ""
+  if (any(is_missing)) {
+    warning(sprintf("Dropped %d sample-metric row(s) with missing '%s'.", sum(is_missing), group_var))
+    long <- long[!is_missing, , drop = FALSE]
+  }
+  long[[group_var]] <- droplevels(as.factor(long[[group_var]]))
 
   n_groups <- length(unique(long[[group_var]]))
   test_method <- test

@@ -29,6 +29,13 @@
 #' @param remove_singletons If `TRUE`, also drop features with a total
 #'   read count of exactly 1 (the classic amplicon "singleton") --
 #'   equivalent to raising `min_total_count` to at least `2`.
+#' @param require_ranks Character vector of `data$taxonomy` rank column
+#'   names (e.g. `c("Kingdom", "Phylum")`) that must have a real
+#'   (non-missing, non-blank) value for a feature to be kept -- e.g. to
+#'   drop ASVs the classifier failed to assign at all, rather than let
+#'   [mp_tax_fix()] label them `"Unclassified"` downstream. A feature
+#'   missing *any* of the given ranks is dropped. `NULL` (default)
+#'   disables this filter.
 #' @return A list with:
 #'   - `data`: the filtered `feature_table`/`taxonomy` (same shape/columns,
 #'     `metadata` untouched), ready for [mp_validate()] or the plot
@@ -46,7 +53,8 @@ mp_filter_features <- function(data,
                                 exclude_ranks = NULL,
                                 exclude_features = NULL,
                                 min_total_count = 0,
-                                remove_singletons = FALSE) {
+                                remove_singletons = FALSE,
+                                require_ranks = NULL) {
   ft <- data$feature_table
   tax <- data$taxonomy
   sample_cols <- setdiff(names(ft), "Feature_ID")
@@ -75,6 +83,16 @@ mp_filter_features <- function(data,
   threshold <- if (remove_singletons) max(min_total_count, 2) else min_total_count
   if (threshold > 0) {
     reasons[["min_total_count"]] <- total_count < threshold
+  }
+
+  if (!is.null(require_ranks)) {
+    ranks <- intersect(require_ranks, names(tax))
+    hit_by_id <- stats::setNames(rep(FALSE, nrow(tax)), tax$Feature_ID)
+    for (r in ranks) {
+      vals <- tax[[r]]
+      hit_by_id <- hit_by_id | is.na(vals) | trimws(vals) == ""
+    }
+    reasons[["missing_rank"]] <- unname(hit_by_id[ft$Feature_ID])
   }
 
   remove <- if (length(reasons) == 0) rep(FALSE, nrow(ft)) else Reduce(`|`, reasons)

@@ -121,6 +121,7 @@ options(shiny.maxRequestSize = 500 * 1024^2)
               placeholder = "e.g. Chloroplast, Mitochondria"),
     checkboxInput(ns("remove_singletons"), "Remove singleton features (total count = 1)", value = FALSE),
     numericInput(ns("min_total_count"), "Min total read count per feature", value = 0, min = 0),
+    uiOutput(ns("require_ranks_ui")),
     uiOutput(ns("filter_summary"))
   )
 }
@@ -197,12 +198,21 @@ taxonomy_server <- function(id) {
       )
     })
 
+    output$require_ranks_ui <- renderUI({
+      req(raw_data())
+      ranks <- setdiff(names(raw_data()$taxonomy), "Feature_ID")
+      selectizeInput(ns("require_ranks"), "Require these ranks to be classified (remove feature if missing)",
+                      choices = ranks, multiple = TRUE,
+                      options = list(placeholder = "e.g. Kingdom, Phylum -- leave empty to keep everything"))
+    })
+
     filtered <- reactive({
       mp_filter_features(
         raw_data(),
         exclude_taxa = .parse_exclude_list(input$exclude_taxa),
         remove_singletons = isTRUE(input$remove_singletons),
-        min_total_count = input$min_total_count %||% 0
+        min_total_count = input$min_total_count %||% 0,
+        require_ranks = if (length(input$require_ranks) > 0) input$require_ranks else NULL
       )
     })
 

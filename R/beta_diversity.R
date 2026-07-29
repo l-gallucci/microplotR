@@ -29,13 +29,27 @@ mp_beta_diversity_plot <- function(data,
 
   ft <- data$feature_table
   sample_cols <- setdiff(names(ft), "Feature_ID")
+  meta <- data$metadata[match(sample_cols, data$metadata$Sample_ID), , drop = FALSE]
+
+  # A sample with no group_var value can't be ordinated/tested by group --
+  # vegan::adonis2() errors outright on NA in the model formula, so this
+  # has to happen before the distance matrix is even built (it can't be
+  # computed on a subset of samples after the fact without recomputing).
+  is_missing <- is.na(meta[[group_var]]) | trimws(as.character(meta[[group_var]])) == ""
+  if (any(is_missing)) {
+    warning(sprintf("Dropped %d sample(s) with missing '%s': %s.",
+                     sum(is_missing), group_var, paste(sample_cols[is_missing], collapse = ", ")))
+    sample_cols <- sample_cols[!is_missing]
+    meta <- meta[!is_missing, , drop = FALSE]
+  }
+  meta[[group_var]] <- droplevels(as.factor(meta[[group_var]]))
+
   mat <- apply(as.matrix(ft[, sample_cols]), 2, as.numeric)
   mat <- sweep(mat, 2, colSums(mat), "/") * 100
   comm <- t(mat)
   rownames(comm) <- sample_cols
 
   dist <- vegan::vegdist(comm, method = method)
-  meta <- data$metadata[match(sample_cols, data$metadata$Sample_ID), , drop = FALSE]
 
   stress_label <- NULL
   if (ordination == "pcoa") {

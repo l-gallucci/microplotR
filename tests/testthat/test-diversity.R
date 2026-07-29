@@ -45,6 +45,18 @@ test_that("test = NULL disables the stat annotation layer", {
   expect_true(length(p_test$layers) > length(p_none$layers))
 })
 
+test_that("a sample with NA group_var is dropped (with a warning), not left as a phantom group", {
+  data <- load_example("example_valid")
+  data$metadata$Group[1] <- NA
+  expect_warning(
+    p <- mp_alpha_diversity_plot(data, group_var = "Group"),
+    "Dropped"
+  )
+  expect_false(anyNA(p$data$Group))
+  dropped_sample <- data$metadata$Sample_ID[1]
+  expect_false(dropped_sample %in% p$data$Sample_ID)
+})
+
 # --- beta diversity ---
 
 test_that("beta diversity PCoA builds with PERMANOVA subtitle", {
@@ -78,4 +90,17 @@ test_that("permanova = FALSE and show_ellipse = FALSE gives no subtitle", {
   data <- load_example("example_valid")
   p <- mp_beta_diversity_plot(data, group_var = "Group", permanova = FALSE, show_ellipse = FALSE)
   expect_null(p$labels$subtitle)
+})
+
+test_that("a sample with NA group_var is dropped (with a warning) instead of erroring adonis2", {
+  data <- load_example("example_valid")
+  na_sample <- data$metadata$Sample_ID[1]
+  data$metadata$Group[1] <- NA
+  expect_warning(
+    p <- mp_beta_diversity_plot(data, group_var = "Group", method = "bray", ordination = "pcoa"),
+    "Dropped"
+  )
+  expect_s3_class(p, "ggplot")
+  expect_false(anyNA(p$data$Group))
+  expect_false(na_sample %in% p$data$Sample_ID)
 })

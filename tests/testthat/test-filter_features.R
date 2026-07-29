@@ -89,3 +89,25 @@ test_that("filtered output is still valid input to mp_validate", {
   report <- mp_validate(out$data)
   expect_true(mp_is_valid(report))
 })
+
+test_that("require_ranks drops features missing a value at any given rank", {
+  data <- make_data()
+  data$taxonomy$Phylum[data$taxonomy$Feature_ID == "F1"] <- NA
+  data$taxonomy$Phylum[data$taxonomy$Feature_ID == "F2"] <- "  "  # blank after trim
+
+  out <- mp_filter_features(data, require_ranks = "Phylum")
+  expect_false("F1" %in% out$data$feature_table$Feature_ID)
+  expect_false("F2" %in% out$data$feature_table$Feature_ID)
+  expect_true(all(c("F3", "F4", "F5") %in% out$data$feature_table$Feature_ID))
+  row <- out$summary[out$summary$reason == "missing_rank", ]
+  expect_equal(row$n_features_removed, 2)
+})
+
+test_that("require_ranks with multiple ranks drops a feature missing any one of them", {
+  data <- make_data()
+  data$taxonomy$Genus[data$taxonomy$Feature_ID == "F5"] <- NA  # Phylum fine, Genus missing
+
+  out <- mp_filter_features(data, require_ranks = c("Phylum", "Genus"))
+  expect_false("F5" %in% out$data$feature_table$Feature_ID)
+  expect_true(all(c("F1", "F2", "F3", "F4") %in% out$data$feature_table$Feature_ID))
+})

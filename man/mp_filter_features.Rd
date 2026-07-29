@@ -10,7 +10,8 @@ mp_filter_features(
   exclude_ranks = NULL,
   exclude_features = NULL,
   min_total_count = 0,
-  remove_singletons = FALSE
+  remove_singletons = FALSE,
+  require_ranks = NULL
 )
 }
 \arguments{
@@ -38,6 +39,14 @@ filter.}
 \item{remove_singletons}{If \code{TRUE}, also drop features with a total
 read count of exactly 1 (the classic amplicon "singleton") --
 equivalent to raising \code{min_total_count} to at least \code{2}.}
+
+\item{require_ranks}{Character vector of \code{data$taxonomy} rank column
+names (e.g. \code{c("Kingdom", "Phylum")}) that must have a real
+(non-missing, non-blank) value for a feature to be kept -- e.g. to
+drop ASVs the classifier failed to assign at all, rather than let
+\code{\link[=mp_tax_fix]{mp_tax_fix()}} label them \code{"Unclassified"} downstream. A feature
+missing \emph{any} of the given ranks is dropped. \code{NULL} (default)
+disables this filter.}
 }
 \value{
 A list with:
